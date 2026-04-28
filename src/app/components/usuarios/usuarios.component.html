@@ -21,9 +21,16 @@
             <tr style="text-align: center;" *ngFor="let usuario of usuarios; let i = index">
                 <td>{{ i + 1 }}</td>
                 <td>{{ usuario.username }}</td>
-                <td>{{ usuario.roles }}</td>
                 <td>
-                    <button class="btn btn-danger btn-sm" (click)="deleteUsuario(usuario.username)">
+                    <span *ngFor="let rol of usuario.roles" class="badge bg-primary me-1">
+                        {{ transformarRol(rol) }}
+                    </span>
+                </td>
+                <td>
+                    <button class="btn btn-primary btn-sm me-1 ms-1" (click)="editarUsuario(usuario)">
+                        <i class="fa fa-edit"></i> Actualizar
+                    </button>
+                    <button class="btn btn-danger btn-sm ms-1" (click)="deleteUsuario(usuario.username)">
                         <i class="fa fa-trash"></i> Eliminar
                     </button>
                 </td>
@@ -90,9 +97,9 @@
                     <div class="mb-3">
                         <label for="roles" class="form-label">Roles</label>
                         <select id="roles" class="form-select" formControlName="roles" multiple size="3">
-                            <!-- <option *ngFor="let rol of roles" [value]="rol">
+                            <option *ngFor="let rol of roles" [value]="rol">
                                 {{ transformarRol(rol) }}
-                            </option> -->
+                            </option>
                         </select>
                         <div class="form-text">
                             Mantén presionada la tecla Ctrl (Cmd en Mac) para seleccionar múltiples roles
