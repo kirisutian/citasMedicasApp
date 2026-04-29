@@ -1,8 +1,9 @@
 import { AfterViewInit, Component, ElementRef, OnInit, ViewChild } from '@angular/core';
-import { UsuarioResponse } from '../../models/Usuario.model';
+import { UsuarioRequest, UsuarioResponse } from '../../models/Usuario.model';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { DescripcionRoles, Roles } from '../../constants/Roles';
 import Swal from 'sweetalert2';
+import { UsuariosService } from '../../services/usuarios.service';
 
 declare var bootstrap: any;
 
@@ -26,31 +27,46 @@ export class UsuariosComponent implements OnInit, AfterViewInit {
 
   private modalInstance!: any;
 
-  constructor(private fb: FormBuilder) {
+  constructor(
+    private fb: FormBuilder,
+    private usuariosService: UsuariosService
+  ) {
     this.usuarioForm = this.fb.group({
-      username: ['', [Validators.required, Validators.minLength(5), Validators.maxLength(20)] ],
-      password: ['', [Validators.required, Validators.minLength(8)] ],
-      roles: [[], [Validators.required] ]
+      username: ['', [Validators.required, Validators.minLength(5), Validators.maxLength(20)]],
+      password: ['', [Validators.required, Validators.minLength(8)]],
+      roles: [[], [Validators.required]]
     });
   }
 
   ngOnInit(): void {
-    this.llenarLista();
+    this.listarUsuarios();
   }
 
   ngAfterViewInit(): void {
-    this.modalInstance = new bootstrap.Modal(this.usuarioModalEl.nativeElement, { keyboard: false} );
+    this.modalInstance = new bootstrap.Modal(this.usuarioModalEl.nativeElement, { keyboard: false });
     this.usuarioModalEl.nativeElement.addEventListener('hidden.bs.modal', () => {
       this.resetForm();
     });
   }
 
-  llenarLista(): void {
+  listarUsuarios(): void {
+    this.usuariosService.getUsuarios().subscribe({
+      next: resp => {
+        this.usuarios = resp;
+      },
+      error: (error) => {
+        console.log('Error al listar usuarios: ', error);
+        Swal.fire('Error', 'No se pudieron cargar los usuarios', 'error');
+      }
+    });
+  }
+
+  /*llenarLista(): void {
     this.usuarios = [
       { username: 'admin', roles: ['ROLE_ADMIN'] },
       { username: 'usuario', roles: ['ROLE_USER'] }
     ];
-  }
+  }*/
 
   toggleForm(): void {
     this.resetForm();
@@ -69,7 +85,7 @@ export class UsuariosComponent implements OnInit, AfterViewInit {
     this.selectedUsuario = usuario;
     this.textoModal = 'Editando Usuario: ' + usuario.username;
 
-    this.usuarioForm.patchValue({...usuario});
+    this.usuarioForm.patchValue({ ...usuario });
     this.modalInstance.show();
   }
 
@@ -79,13 +95,42 @@ export class UsuariosComponent implements OnInit, AfterViewInit {
 
   onSubmit(): void {
     //console.info('Valor del formulario: ', this.usuarioForm.value);
-    if(this.usuarioForm.invalid) return;
+    if (this.usuarioForm.invalid) return;
 
-    const usuarioData: UsuarioResponse = this.usuarioForm.value;
+    const usuarioData: UsuarioRequest = this.usuarioForm.value;
 
-    this.usuarios.push(usuarioData);
-    Swal.fire('Registrado', 'Usuario registrado correctamente', 'success');
-    this.modalInstance.hide();
+    if(this.isEditMode && this.selectedUsuario) {
+      //ACTUALIZANDO
+      this.usuariosService.putUsuario(usuarioData, usuarioData.username).subscribe({
+        next: usuarioActualizado => {
+
+          const index: number = this.usuarios.findIndex(usuario => usuario.username === this.selectedUsuario?.username);
+          if(index !== -1) this.usuarios[index] = usuarioActualizado;
+
+          Swal.fire('Registrado', 'Usuario actualizado correctamente', 'success');
+          this.modalInstance.hide();
+        },
+        error: (error) => {
+          console.log('Error al actualizar usuario: ', error);
+          Swal.fire('Error', 'No se pudo actualizar el usuario', 'error');
+        }
+      });
+    } else {
+      //REGISTRANDO
+      this.usuariosService.postUsuario(usuarioData).subscribe({
+        next: nuevoUsuario => {
+          this.usuarios.push(nuevoUsuario);
+          Swal.fire('Registrado', 'Usuario registrado correctamente', 'success');
+          this.modalInstance.hide();
+        },
+        error: (error) => {
+          console.log('Error al registrar usuario: ', error);
+          Swal.fire('Error', 'No se pudo registrar el usuario', 'error');
+        }
+      });
+    }
+
+
   }
 
   deleteUsuario(username: string): void {
@@ -97,9 +142,17 @@ export class UsuariosComponent implements OnInit, AfterViewInit {
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar'
     }).then(result => {
-      if(result.isConfirmed) {
-        this.usuarios = this.usuarios.filter(u => u.username !== username);
-        Swal.fire('Eliminado', 'Usuario eliminado correctamente', 'success');
+      if (result.isConfirmed) {
+        this.usuariosService.deleteUsuario(username).subscribe({
+          next: () => {
+            this.usuarios = this.usuarios.filter(u => u.username !== username);
+            Swal.fire('Eliminado', 'Usuario eliminado correctamente', 'success');
+          },
+          error: (error) => {
+            console.log('Error al eliminar usuario: ', error);
+            Swal.fire('Error', 'No se pudo eliminar el usuario', 'error');
+          }
+        });
       }
     });
   }
